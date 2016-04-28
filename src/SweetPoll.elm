@@ -1,8 +1,8 @@
-module SweetPoll (Config, defaultConfig, Action(..), Model, SweetPoll, create) where
+module SweetPoll (Config, defaultConfig, Action(..), Model, init, update) where
 
 {-|
 
-@docs Config, defaultConfig, SweetPoll, create, Action, Model
+@docs Config, defaultConfig, init, update, Action, Model
 -}
 
 import Testable.Effects as Effects exposing (Effects)
@@ -59,77 +59,66 @@ type Model data
       { delayMultiplier : Float
       , sameCount : Int
       , lastData : Maybe data
+      , config : Config data
       }
 
 
 {-| -}
-type alias SweetPoll data =
-  { init : ( Model data, Effects (Action data) )
-  , update : Action data -> Model data -> ( Model data, Effects (Action data) )
-  }
+init : Config data -> ( Model data, Effects (Action data) )
+init config =
+  Model
+    { delayMultiplier = 1.0
+    , sameCount = 1
+    , lastData = Nothing
+    , config = config
+    }
+    |> runPoll
 
 
-{-| Create a SweetPoll component.
-
-    SweetPoll.create
-      { decoder = myDataDecoder
-      , url = "https://myserver.example.com/json"
-      }
-
--}
-create : Config data -> SweetPoll data
-create config =
-  { init =
-      Model
-        { delayMultiplier = 1.0
-        , sameCount = 1
-        , lastData = Nothing
-        }
-        |> runPoll config
-  , update =
-      \action (Model model) ->
+{-| -}
+update : Action data -> Model data -> ( Model data, Effects (Action data) )
+update action (Model model) =
+  let
+    newDelayMultiplier =
+      model.delayMultiplier * model.config.delayMultiplier
+  in
+    case action of
+      PollSuccess newData ->
         let
-          newDelayMultiplier =
-            model.delayMultiplier * config.delayMultiplier
+          ( newDelayMultiplier, newSameCount ) =
+            if (Just newData /= model.lastData) then
+              -- If we got a different response, reset everything.
+              ( 1.0, 1 )
+            else if model.sameCount + 1 >= model.config.samesBeforeDelay then
+              -- If we got the same response too many times in a row, up the delay.
+              ( model.delayMultiplier * 1.2, model.sameCount + 1 )
+            else
+              -- Otherwise, leave everything the same.
+              ( model.delayMultiplier, model.sameCount + 1 )
         in
-          case action of
-            PollSuccess newData ->
-              let
-                ( newDelayMultiplier, newSameCount ) =
-                  if (Just newData /= model.lastData) then
-                    -- If we got a different response, reset everything.
-                    ( 1.0, 1 )
-                  else if model.sameCount + 1 >= config.samesBeforeDelay then
-                    -- If we got the same response too many times in a row, up the delay.
-                    ( model.delayMultiplier * 1.2, model.sameCount + 1 )
-                  else
-                    -- Otherwise, leave everything the same.
-                    ( model.delayMultiplier, model.sameCount + 1 )
-              in
-                Model
-                  { model
-                    | lastData = Just newData
-                    , delayMultiplier = newDelayMultiplier
-                    , sameCount = newSameCount
-                  }
-                  |> runPoll config
+          Model
+            { model
+              | lastData = Just newData
+              , delayMultiplier = newDelayMultiplier
+              , sameCount = newSameCount
+            }
+            |> runPoll
 
-            PollFailure _ ->
-              -- If there was an error, increase the delay and try again.
-              -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
-              if config.delay * newDelayMultiplier <= config.maxDelay then
-                Model { model | delayMultiplier = newDelayMultiplier }
-                  |> runPoll config
-              else
-                ( Model model, Effects.none )
-  }
+      PollFailure _ ->
+        -- If there was an error, increase the delay and try again.
+        -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
+        if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
+          Model { model | delayMultiplier = newDelayMultiplier }
+            |> runPoll
+        else
+          ( Model model, Effects.none )
 
 
-runPoll : Config data -> Model data -> ( Model data, Effects (Action data) )
-runPoll config (Model model) =
+runPoll : Model data -> ( Model data, Effects (Action data) )
+runPoll (Model model) =
   ( Model model
-  , Task.sleep (config.delay * model.delayMultiplier)
-      |> Task.andThen (\_ -> Http.get config.decoder config.url)
+  , Task.sleep (model.config.delay * model.delayMultiplier)
+      |> Task.andThen (\_ -> Http.get model.config.decoder model.config.url)
       |> Task.toResult
       |> Task.map fromResult
       |> Effects.task

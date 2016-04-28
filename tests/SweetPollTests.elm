@@ -2,7 +2,7 @@ module SweetPollTests (..) where
 
 import ElmTest exposing (..)
 import Json.Decode as Json
-import SweetPoll exposing (SweetPoll)
+import SweetPoll
 import Time
 import Testable.Http as Http
 import Http as RealHttp
@@ -19,10 +19,9 @@ myDataDecoder =
   Json.string |> Json.map MyData
 
 
-subject : SweetPoll MyData
-subject =
-  SweetPoll.create
-    <| SweetPoll.defaultConfig myDataDecoder "https://example.com/"
+config : SweetPoll.Config MyData
+config =
+  SweetPoll.defaultConfig myDataDecoder "https://example.com/"
 
 
 container :
@@ -33,14 +32,14 @@ container :
     }
 container =
   { init =
-      case subject.init of
+      case SweetPoll.init config of
         ( model, effects ) ->
           ( { sweetPoll = model, lastAction = Nothing }
           , effects
           )
   , update =
       \action model ->
-        case subject.update action model.sweetPoll of
+        case SweetPoll.update action model.sweetPoll of
           ( newModel, effects ) ->
             ( { sweetPoll = newModel
               , lastAction = Just action
