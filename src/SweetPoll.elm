@@ -55,7 +55,9 @@ fromResult result =
 {-| Private state of the SweetPoll component
 -}
 type Model
-  = Model ()
+  = Model
+      { delayMultiplier : Float
+      }
 
 
 {-| -}
@@ -84,15 +86,21 @@ create config =
         |> Effects.task
   in
     { init =
-        ( Model ()
+        ( Model { delayMultiplier = 1.0 }
         , pollEffect 1.0
         )
     , update =
-        \action model ->
+        \action (Model model) ->
           case action of
             PollSuccess _ ->
-              ( model, pollEffect 1.0 )
+              ( Model model, pollEffect model.delayMultiplier )
 
             PollFailure _ ->
-              ( model, pollEffect config.delayMultiplier )
+              let
+                newDelayMultiplier =
+                  model.delayMultiplier * config.delayMultiplier
+              in
+                ( Model { model | delayMultiplier = newDelayMultiplier }
+                , pollEffect newDelayMultiplier
+                )
     }

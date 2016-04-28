@@ -110,5 +110,25 @@ all =
                   |> assertNoPendingHttpRequests
                   |> test "(2)"
               ]
+          , suite
+              "delay increases after each error"
+              [ failedNetworkRequest
+                  |> advanceTime (7 * Time.second * 1.2)
+                  |> resolveHttpRequest
+                      (Http.getRequest "https://example.com/")
+                      (Err RealHttp.RawTimeout)
+                  |> advanceTime (7 * Time.second * 1.2 * 1.2)
+                  |> assertHttpRequest
+                      (Http.getRequest "https://example.com/")
+                  |> test "(1)"
+              , failedNetworkRequest
+                  |> advanceTime (7 * Time.second * 1.2)
+                  |> resolveHttpRequest
+                      (Http.getRequest "https://example.com/")
+                      (Err RealHttp.RawTimeout)
+                  |> advanceTime (7 * Time.second * 1.2 * 1.2 - 1)
+                  |> assertNoPendingHttpRequests
+                  |> test "(1)"
+              ]
           ]
     ]
