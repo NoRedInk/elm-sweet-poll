@@ -100,7 +100,10 @@ create config =
                 newDelayMultiplier =
                   model.delayMultiplier * config.delayMultiplier
               in
-                ( Model { model | delayMultiplier = newDelayMultiplier }
-                , pollEffect newDelayMultiplier
-                )
+                if config.delay * newDelayMultiplier <= config.maxDelay then
+                  ( Model { model | delayMultiplier = newDelayMultiplier }
+                  , pollEffect newDelayMultiplier
+                  )
+                else
+                  ( Model model, Effects.none )
     }

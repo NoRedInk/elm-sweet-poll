@@ -130,5 +130,43 @@ all =
                   |> assertNoPendingHttpRequests
                   |> test "(1)"
               ]
+          , failedNetworkRequest
+              |> advanceTime (7 * Time.second * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+              |> advanceTime 10000000
+              |> assertNoPendingHttpRequests
+              |> test "if the max delay is reached with no successful polls, then stop polling"
           ]
     ]
