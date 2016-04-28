@@ -98,10 +98,17 @@ all =
               |> Result.map .lastAction
               |> assertEqual (Ok <| Just <| SweetPoll.PollFailure <| RealHttp.Timeout)
               |> test "sends data to the parent"
-          , failedNetworkRequest
-              |> advanceTime (7 * Time.second)
-              |> assertHttpRequest
-                  (Http.getRequest "https://example.com/")
-              |> test "makes a new HTTP request after the delay"
+          , suite
+              "makes a new HTTP request after an increased delay"
+              [ failedNetworkRequest
+                  |> advanceTime (7 * Time.second * 1.2)
+                  |> assertHttpRequest
+                      (Http.getRequest "https://example.com/")
+                  |> test "(1)"
+              , failedNetworkRequest
+                  |> advanceTime (7 * Time.second * 1.2 - 1)
+                  |> assertNoPendingHttpRequests
+                  |> test "(2)"
+              ]
           ]
     ]

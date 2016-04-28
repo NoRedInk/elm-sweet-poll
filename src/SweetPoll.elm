@@ -76,8 +76,8 @@ type alias SweetPoll data =
 create : Config data -> SweetPoll data
 create config =
   let
-    pollEffect =
-      Task.sleep config.delay
+    pollEffect multiplier =
+      Task.sleep (config.delay * multiplier)
         |> Task.andThen (\_ -> Http.get config.decoder config.url)
         |> Task.toResult
         |> Task.map fromResult
@@ -85,9 +85,14 @@ create config =
   in
     { init =
         ( Model ()
-        , pollEffect
+        , pollEffect 1.0
         )
     , update =
         \action model ->
-          ( model, pollEffect )
+          case action of
+            PollSuccess _ ->
+              ( model, pollEffect 1.0 )
+
+            PollFailure _ ->
+              ( model, pollEffect config.delayMultiplier )
     }
