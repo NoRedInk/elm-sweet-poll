@@ -28,7 +28,7 @@ subject =
 container :
   Component
     (SweetPoll.Action MyData)
-    { sweetPoll : SweetPoll.Model
+    { sweetPoll : SweetPoll.Model MyData
     , lastAction : Maybe (SweetPoll.Action MyData)
     }
 container =
@@ -86,12 +86,23 @@ all =
               |> advanceTime (7 * Time.second)
               |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
               |> advanceTime (7 * Time.second)
-              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-2\"")
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
               |> advanceTime (7 * Time.second)
-              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-3\"")
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
               |> advanceTime (7 * Time.second)
               |> assertNoPendingHttpRequests
               |> test "increases the delay when the same data is returned 3 times in a row"
+          , container
+              |> startForTest
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-2\"")
+              |> advanceTime (7 * Time.second)
+              |> assertHttpRequest (Http.getRequest "https://example.com/")
+              |> test "don't increase the delay when the new data is returned"
           ]
     , let
         failedNetworkRequest =

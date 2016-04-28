@@ -54,17 +54,18 @@ fromResult result =
 
 {-| Private state of the SweetPoll component
 -}
-type Model
+type Model data
   = Model
       { delayMultiplier : Float
       , sameCount : Int
+      , lastData : Maybe data
       }
 
 
 {-| -}
 type alias SweetPoll data =
-  { init : ( Model, Effects (Action data) )
-  , update : Action data -> Model -> ( Model, Effects (Action data) )
+  { init : ( Model data, Effects (Action data) )
+  , update : Action data -> Model data -> ( Model data, Effects (Action data) )
   }
 
 
@@ -81,7 +82,8 @@ create config =
   { init =
       Model
         { delayMultiplier = 1.0
-        , sameCount = 0
+        , sameCount = 1
+        , lastData = Nothing
         }
         |> triggerPoll config
   , update =
@@ -91,16 +93,10 @@ create config =
             model.delayMultiplier * config.delayMultiplier
         in
           case action of
-            PollSuccess _ ->
-              Model
-                { model
-                  | sameCount = model.sameCount + 1
-                  , delayMultiplier =
-                      if model.sameCount + 1 >= config.samesBeforeDelay then
-                        newDelayMultiplier
-                      else
-                        model.delayMultiplier
-                }
+            PollSuccess newData ->
+              Model { model | lastData = Just newData }
+                |> incrementSameCountIf (Just newData == model.lastData)
+                |> increaseMultiplierIfSameCountExceeded config
                 |> triggerPoll config
 
             PollFailure _ ->
@@ -112,7 +108,27 @@ create config =
   }
 
 
-triggerPoll : Config data -> Model -> ( Model, Effects (Action data) )
+incrementSameCountIf : Bool -> Model data -> Model data
+incrementSameCountIf condition (Model model) =
+  if condition then
+    Model { model | sameCount = model.sameCount + 1 }
+  else
+    Model model
+
+
+increaseMultiplierIfSameCountExceeded : Config data -> Model data -> Model data
+increaseMultiplierIfSameCountExceeded config (Model model) =
+  Model
+    { model
+      | delayMultiplier =
+          if model.sameCount >= config.samesBeforeDelay then
+            model.delayMultiplier * config.delayMultiplier
+          else
+            model.delayMultiplier
+    }
+
+
+triggerPoll : Config data -> Model data -> ( Model data, Effects (Action data) )
 triggerPoll config (Model model) =
   ( Model model
   , Task.sleep (config.delay * model.delayMultiplier)
