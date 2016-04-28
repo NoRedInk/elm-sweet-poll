@@ -22,9 +22,7 @@ myDataDecoder =
 subject : SweetPoll MyData
 subject =
   SweetPoll.create
-    { decoder = myDataDecoder
-    , url = "https://example.com/"
-    }
+    <| SweetPoll.defaultConfig myDataDecoder "https://example.com/"
 
 
 container :
@@ -58,15 +56,15 @@ all =
     "SweetPoll"
     [ container
         |> startForTest
-        |> advanceTime (5 * Time.second)
+        |> advanceTime (7 * Time.second)
         |> assertHttpRequest
             (Http.getRequest "https://example.com/")
-        |> test "makes an initial HTTP request after 5 seconds"
+        |> test "makes an initial HTTP request after the delay"
     , let
         successfulNetworkRequest =
           container
             |> startForTest
-            |> advanceTime (5 * Time.second)
+            |> advanceTime (7 * Time.second)
             |> resolveHttpRequest
                 (Http.getRequest "https://example.com/")
                 (Http.ok "\"data-1\"")
@@ -79,16 +77,16 @@ all =
               |> assertEqual (Ok <| Just <| SweetPoll.PollSuccess <| MyData "data-1")
               |> test "sends data to the parent"
           , successfulNetworkRequest
-              |> advanceTime (5 * Time.second)
+              |> advanceTime (7 * Time.second)
               |> assertHttpRequest
                   (Http.getRequest "https://example.com/")
-              |> test "makes a new HTTP request after 5 seconds"
+              |> test "makes a new HTTP request after the delay"
           ]
     , let
         failedNetworkRequest =
           container
             |> startForTest
-            |> advanceTime (5 * Time.second)
+            |> advanceTime (7 * Time.second)
             |> resolveHttpRequest
                 (Http.getRequest "https://example.com/")
                 (Err RealHttp.RawTimeout)
@@ -101,9 +99,9 @@ all =
               |> assertEqual (Ok <| Just <| SweetPoll.PollFailure <| RealHttp.Timeout)
               |> test "sends data to the parent"
           , failedNetworkRequest
-              |> advanceTime (5 * Time.second)
+              |> advanceTime (7 * Time.second)
               |> assertHttpRequest
                   (Http.getRequest "https://example.com/")
-              |> test "makes a new HTTP request after 5 seconds"
+              |> test "makes a new HTTP request after the delay"
           ]
     ]
