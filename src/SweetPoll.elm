@@ -57,6 +57,7 @@ fromResult result =
 type Model
   = Model
       { delayMultiplier : Float
+      , sameCount : Int
       }
 
 
@@ -77,33 +78,46 @@ type alias SweetPoll data =
 -}
 create : Config data -> SweetPoll data
 create config =
-  let
-    pollEffect multiplier =
-      Task.sleep (config.delay * multiplier)
-        |> Task.andThen (\_ -> Http.get config.decoder config.url)
-        |> Task.toResult
-        |> Task.map fromResult
-        |> Effects.task
-  in
-    { init =
-        ( Model { delayMultiplier = 1.0 }
-        , pollEffect 1.0
-        )
-    , update =
-        \action (Model model) ->
+  { init =
+      Model
+        { delayMultiplier = 1.0
+        , sameCount = 0
+        }
+        |> triggerPoll config
+  , update =
+      \action (Model model) ->
+        let
+          newDelayMultiplier =
+            model.delayMultiplier * config.delayMultiplier
+        in
           case action of
             PollSuccess _ ->
-              ( Model model, pollEffect model.delayMultiplier )
+              Model
+                { model
+                  | sameCount = model.sameCount + 1
+                  , delayMultiplier =
+                      if model.sameCount + 1 >= config.samesBeforeDelay then
+                        newDelayMultiplier
+                      else
+                        model.delayMultiplier
+                }
+                |> triggerPoll config
 
             PollFailure _ ->
-              let
-                newDelayMultiplier =
-                  model.delayMultiplier * config.delayMultiplier
-              in
-                if config.delay * newDelayMultiplier <= config.maxDelay then
-                  ( Model { model | delayMultiplier = newDelayMultiplier }
-                  , pollEffect newDelayMultiplier
-                  )
-                else
-                  ( Model model, Effects.none )
-    }
+              if config.delay * newDelayMultiplier <= config.maxDelay then
+                Model { model | delayMultiplier = newDelayMultiplier }
+                  |> triggerPoll config
+              else
+                ( Model model, Effects.none )
+  }
+
+
+triggerPoll : Config data -> Model -> ( Model, Effects (Action data) )
+triggerPoll config (Model model) =
+  ( Model model
+  , Task.sleep (config.delay * model.delayMultiplier)
+      |> Task.andThen (\_ -> Http.get config.decoder config.url)
+      |> Task.toResult
+      |> Task.map fromResult
+      |> Effects.task
+  )

@@ -81,6 +81,17 @@ all =
               |> assertHttpRequest
                   (Http.getRequest "https://example.com/")
               |> test "makes a new HTTP request after the delay"
+          , container
+              |> startForTest
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-2\"")
+              |> advanceTime (7 * Time.second)
+              |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-3\"")
+              |> advanceTime (7 * Time.second)
+              |> assertNoPendingHttpRequests
+              |> test "increases the delay when the same data is returned 3 times in a row"
           ]
     , let
         failedNetworkRequest =
