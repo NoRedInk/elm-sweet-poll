@@ -94,10 +94,22 @@ create config =
         in
           case action of
             PollSuccess newData ->
-              Model { model | lastData = Just newData }
-                |> incrementSameCountIf (Just newData == model.lastData)
-                |> increaseMultiplierIfSameCountExceeded config
-                |> triggerPoll config
+              let
+                ( newDelayMultiplier, newSameCount ) =
+                  if (Just newData /= model.lastData) then
+                    ( 1.0, 1 )
+                  else if model.sameCount + 1 >= config.samesBeforeDelay then
+                    ( model.delayMultiplier * 1.2, model.sameCount + 1 )
+                  else
+                    ( model.delayMultiplier, model.sameCount + 1 )
+              in
+                Model
+                  { model
+                    | lastData = Just newData
+                    , delayMultiplier = newDelayMultiplier
+                    , sameCount = newSameCount
+                  }
+                  |> triggerPoll config
 
             PollFailure _ ->
               if config.delay * newDelayMultiplier <= config.maxDelay then
@@ -106,26 +118,6 @@ create config =
               else
                 ( Model model, Effects.none )
   }
-
-
-incrementSameCountIf : Bool -> Model data -> Model data
-incrementSameCountIf condition (Model model) =
-  if condition then
-    Model { model | sameCount = model.sameCount + 1 }
-  else
-    Model model
-
-
-increaseMultiplierIfSameCountExceeded : Config data -> Model data -> Model data
-increaseMultiplierIfSameCountExceeded config (Model model) =
-  Model
-    { model
-      | delayMultiplier =
-          if model.sameCount >= config.samesBeforeDelay then
-            model.delayMultiplier * config.delayMultiplier
-          else
-            model.delayMultiplier
-    }
 
 
 triggerPoll : Config data -> Model data -> ( Model data, Effects (Action data) )
