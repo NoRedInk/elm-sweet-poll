@@ -85,7 +85,7 @@ create config =
         , sameCount = 1
         , lastData = Nothing
         }
-        |> triggerPoll config
+        |> runPoll config
   , update =
       \action (Model model) ->
         let
@@ -97,10 +97,13 @@ create config =
               let
                 ( newDelayMultiplier, newSameCount ) =
                   if (Just newData /= model.lastData) then
+                    -- If we got a different response, reset everything.
                     ( 1.0, 1 )
                   else if model.sameCount + 1 >= config.samesBeforeDelay then
+                    -- If we got the same response too many times in a row, up the delay.
                     ( model.delayMultiplier * 1.2, model.sameCount + 1 )
                   else
+                    -- Otherwise, leave everything the same.
                     ( model.delayMultiplier, model.sameCount + 1 )
               in
                 Model
@@ -109,19 +112,21 @@ create config =
                     , delayMultiplier = newDelayMultiplier
                     , sameCount = newSameCount
                   }
-                  |> triggerPoll config
+                  |> runPoll config
 
             PollFailure _ ->
+              -- If there was an error, increase the delay and try again.
+              -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
               if config.delay * newDelayMultiplier <= config.maxDelay then
                 Model { model | delayMultiplier = newDelayMultiplier }
-                  |> triggerPoll config
+                  |> runPoll config
               else
                 ( Model model, Effects.none )
   }
 
 
-triggerPoll : Config data -> Model data -> ( Model data, Effects (Action data) )
-triggerPoll config (Model model) =
+runPoll : Config data -> Model data -> ( Model data, Effects (Action data) )
+runPoll config (Model model) =
   ( Model model
   , Task.sleep (config.delay * model.delayMultiplier)
       |> Task.andThen (\_ -> Http.get config.decoder config.url)
