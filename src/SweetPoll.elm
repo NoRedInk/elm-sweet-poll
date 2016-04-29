@@ -1,8 +1,15 @@
-module SweetPoll (Config, defaultConfig, Action(..), Model, init, update) where
+module SweetPoll (Config, defaultConfig, Model, Action(..), init, update, ComponentModel, componentUpdate) where
 
 {-|
 
-@docs Config, defaultConfig, init, update, Action, Model
+# Configuration
+@docs Config, defaultConfig
+
+# Elm Artchitecture
+@docs Model, Action, init, update
+
+# Record Extension Component
+@docs ComponentModel, componentUpdate
 -}
 
 import Testable.Effects as Effects exposing (Effects)
@@ -75,7 +82,8 @@ init config =
     |> runPoll
 
 
-{-| -}
+{-| The SweetPoll StartApp-style update function
+-}
 update : Action data -> Model data -> ( Model data, Effects (Action data) )
 update action (Model model) =
   let
@@ -122,4 +130,25 @@ runPoll (Model model) =
       |> Task.toResult
       |> Task.map fromResult
       |> Effects.task
+  )
+
+
+{-| Model type for using the NoRedInk/elm-api-components pattern
+-}
+type alias ComponentModel base data =
+  { base | sweetPoll : Model data }
+
+
+{-| Update function for using the NoRedInk/elm-api-components pattern
+-}
+componentUpdate : Action data -> ComponentModel base data -> ( ComponentModel base data, Effects (Action data) )
+componentUpdate action parentModel =
+  update action parentModel.sweetPoll
+    |> mergeWithParent parentModel
+
+
+mergeWithParent : ComponentModel base data -> ( Model data, Effects (Action data) ) -> ( ComponentModel base data, Effects (Action data) )
+mergeWithParent parentModel ( privateModel, effects ) =
+  ( { parentModel | sweetPoll = privateModel }
+  , effects
   )
