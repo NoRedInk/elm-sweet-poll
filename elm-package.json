@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "summary": "HTTP polling with backoff when the server response doesn't change",
     "repository": "https://github.com/NoRedInk/elm-sweet-poll.git",
     "license": "BSD3",
