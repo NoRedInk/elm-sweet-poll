@@ -1,4 +1,4 @@
-module Tests (..) where
+module Tests exposing (..)
 
 import ElmTest exposing (..)
 import SweetPollTests
@@ -6,7 +6,7 @@ import SweetPollTests
 
 all : Test
 all =
-  suite
-    "NoRedInk/elm-sweet-poll"
-    [ SweetPollTests.all
-    ]
+    suite
+        "NoRedInk/elm-sweet-poll"
+        [ SweetPollTests.all
+        ]
