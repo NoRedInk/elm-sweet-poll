@@ -65,11 +65,17 @@ init config =
         , lastData = Nothing
         , config = config
         }
-        |> runPoll Nothing
-        |> (\( model, _, cmd ) -> ( model, cmd ))
+        |> runPoll
+        |> -- lastData will always be Nothing here, so strip it out to keep init's type signature nicer
+           (\( model, _, cmd ) -> ( model, cmd ))
 
 
 {-| The SweetPoll StartApp-style update function
+
+Returns:
+  - The new SweetPoll model
+  - The current data, if there is any
+  - A command to keep SweetPoll running
 -}
 update : Msg data -> Model data -> ( Model data, Maybe data, Cmd (Msg data) )
 update action (Model model) =
@@ -80,8 +86,11 @@ update action (Model model) =
         case action of
             PollResult (Ok newData) ->
                 let
+                    dataChanged =
+                        Just newData /= model.lastData
+
                     ( newDelayMultiplier, newSameCount ) =
-                        if (Just newData /= model.lastData) then
+                        if dataChanged then
                             -- If we got a different response, reset everything.
                             ( 1.0, 1 )
                         else if model.sameCount + 1 >= model.config.samesBeforeDelay then
@@ -97,22 +106,22 @@ update action (Model model) =
                             , delayMultiplier = newDelayMultiplier
                             , sameCount = newSameCount
                         }
-                        |> runPoll (Just newData)
+                        |> runPoll
 
             PollResult (Err _) ->
                 -- If there was an error, increase the delay and try again.
                 -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
                 if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
                     Model { model | delayMultiplier = newDelayMultiplier }
-                        |> runPoll Nothing
+                        |> runPoll
                 else
-                    ( Model model, Nothing, Cmd.none )
+                    ( Model model, model.lastData, Cmd.none )
 
 
-runPoll : Maybe data -> Model data -> ( Model data, Maybe data, Cmd (Msg data) )
-runPoll newData (Model model) =
+runPoll : Model data -> ( Model data, Maybe data, Cmd (Msg data) )
+runPoll (Model model) =
     ( Model model
-    , newData
+    , model.lastData
     , Process.sleep (model.config.delay * model.delayMultiplier)
         |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
         |> Task.attempt PollResult
