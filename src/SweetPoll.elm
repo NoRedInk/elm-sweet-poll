@@ -1,4 +1,4 @@
-module SweetPoll exposing (Config, defaultConfig, Model, Action(..), init, update, ComponentModel, componentUpdate)
+module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update, ComponentModel, componentUpdate)
 
 {-|
 
@@ -6,7 +6,7 @@ module SweetPoll exposing (Config, defaultConfig, Model, Action(..), init, updat
 @docs Config, defaultConfig
 
 # Elm Artchitecture
-@docs Model, Action, init, update
+@docs Model, Msg, init, update
 
 # Record Extension Component
 @docs ComponentModel, componentUpdate
@@ -17,6 +17,7 @@ import Json.Decode as Json
 import Process
 import Task
 import Time exposing (Time)
+
 
 {-| -}
 type alias Config data =
@@ -43,7 +44,7 @@ defaultConfig decoder url =
 
 
 {-| -}
-type Action data
+type Msg data
     = PollResult (Result Http.Error data)
 
 
@@ -59,7 +60,7 @@ type Model data
 
 
 {-| -}
-init : Config data -> ( Model data, Cmd (Action data) )
+init : Config data -> ( Model data, Cmd (Msg data) )
 init config =
     Model
         { delayMultiplier = 1.0
@@ -72,7 +73,7 @@ init config =
 
 {-| The SweetPoll StartApp-style update function
 -}
-update : Action data -> Model data -> ( Model data, Cmd (Action data) )
+update : Msg data -> Model data -> ( Model data, Cmd (Msg data) )
 update action (Model model) =
     let
         newDelayMultiplier =
@@ -110,11 +111,11 @@ update action (Model model) =
                     ( Model model, Cmd.none )
 
 
-runPoll : Model data -> ( Model data, Cmd (Action data) )
+runPoll : Model data -> ( Model data, Cmd (Msg data) )
 runPoll (Model model) =
     ( Model model
     , Process.sleep (model.config.delay * model.delayMultiplier)
-        |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder )
+        |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
         |> Task.attempt PollResult
     )
 
@@ -127,13 +128,13 @@ type alias ComponentModel base data =
 
 {-| Update function for using the NoRedInk/elm-api-components pattern
 -}
-componentUpdate : Action data -> ComponentModel base data -> ( ComponentModel base data, Cmd (Action data) )
+componentUpdate : Msg data -> ComponentModel base data -> ( ComponentModel base data, Cmd (Msg data) )
 componentUpdate action parentModel =
     update action parentModel.sweetPoll
         |> mergeWithParent parentModel
 
 
-mergeWithParent : ComponentModel base data -> ( Model data, Cmd (Action data) ) -> ( ComponentModel base data, Cmd (Action data) )
+mergeWithParent : ComponentModel base data -> ( Model data, Cmd (Msg data) ) -> ( ComponentModel base data, Cmd (Msg data) )
 mergeWithParent parentModel ( privateModel, effects ) =
     ( { parentModel | sweetPoll = privateModel }
     , effects
