@@ -1,4 +1,4 @@
-module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update, ComponentModel, componentUpdate)
+module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update)
 
 {-|
 
@@ -7,9 +7,6 @@ module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update, Comp
 
 # Elm Artchitecture
 @docs Model, Msg, init, update
-
-# Record Extension Component
-@docs ComponentModel, componentUpdate
 -}
 
 import Http
@@ -68,12 +65,13 @@ init config =
         , lastData = Nothing
         , config = config
         }
-        |> runPoll
+        |> runPoll Nothing
+        |> (\( model, _, cmd ) -> ( model, cmd ))
 
 
 {-| The SweetPoll StartApp-style update function
 -}
-update : Msg data -> Model data -> ( Model data, Cmd (Msg data) )
+update : Msg data -> Model data -> ( Model data, Maybe data, Cmd (Msg data) )
 update action (Model model) =
     let
         newDelayMultiplier =
@@ -99,43 +97,23 @@ update action (Model model) =
                             , delayMultiplier = newDelayMultiplier
                             , sameCount = newSameCount
                         }
-                        |> runPoll
+                        |> runPoll (Just newData)
 
             PollResult (Err _) ->
                 -- If there was an error, increase the delay and try again.
                 -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
                 if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
                     Model { model | delayMultiplier = newDelayMultiplier }
-                        |> runPoll
+                        |> runPoll Nothing
                 else
-                    ( Model model, Cmd.none )
+                    ( Model model, Nothing, Cmd.none )
 
 
-runPoll : Model data -> ( Model data, Cmd (Msg data) )
-runPoll (Model model) =
+runPoll : Maybe data -> Model data -> ( Model data, Maybe data, Cmd (Msg data) )
+runPoll newData (Model model) =
     ( Model model
+    , newData
     , Process.sleep (model.config.delay * model.delayMultiplier)
         |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
         |> Task.attempt PollResult
-    )
-
-
-{-| Model type for using the NoRedInk/elm-api-components pattern
--}
-type alias ComponentModel base data =
-    { base | sweetPoll : Model data }
-
-
-{-| Update function for using the NoRedInk/elm-api-components pattern
--}
-componentUpdate : Msg data -> ComponentModel base data -> ( ComponentModel base data, Cmd (Msg data) )
-componentUpdate action parentModel =
-    update action parentModel.sweetPoll
-        |> mergeWithParent parentModel
-
-
-mergeWithParent : ComponentModel base data -> ( Model data, Cmd (Msg data) ) -> ( ComponentModel base data, Cmd (Msg data) )
-mergeWithParent parentModel ( privateModel, effects ) =
-    ( { parentModel | sweetPoll = privateModel }
-    , effects
     )
