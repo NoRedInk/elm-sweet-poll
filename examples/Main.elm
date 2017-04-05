@@ -37,17 +37,17 @@ main =
             , update =
                 \action model ->
                     case Debug.log "update" <| SweetPoll.update action model.sweetPoll of
-                        { sweetPollModel, currentData, error, cmd } ->
+                        { sweetPollModel, newData, error, cmd } ->
                             ( { sweetPoll = sweetPollModel
-                              , data = currentData
-                              , error = Maybe.map toString error
+                              , data = newData
+                              , error = error |> Maybe.map toString
                               }
                             , cmd
                             )
             , view =
                 \model ->
                     Html.div []
-                        [ Html.text ("data: " ++ toString model.data)
+                        [ Html.text ("new data: " ++ toString model.data)
                         , Html.hr [] []
                         , Html.text ("error: " ++ toString model.error)
                         ]

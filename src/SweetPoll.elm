@@ -59,28 +59,28 @@ type Model data
 {-| -}
 init : Config data -> ( Model data, Cmd (Msg data) )
 init config =
-    Model
-        { delayMultiplier = 1.0
-        , sameCount = 1
-        , lastData = Nothing
-        , config = config
-        }
-        |> runPoll
-        |> -- lastData and error will always be Nothing here,
-           -- so strip it out to keep init's type signature nicer
-           (\result -> ( result.sweetPollModel, result.cmd ))
+    let
+        model =
+            Model
+                { delayMultiplier = 1.0
+                , sameCount = 1
+                , lastData = Nothing
+                , config = config
+                }
+    in
+        ( model, runPoll model )
 
 
 {-|
 
  - sweetPollModel: the new state of the SweetPoll
- - currentData: the most recent data received by the SweetPoll
+ - newData: any new data received by the SweetPoll
  - error: any new error occurring in the current update cycle
  - cmd: a Cmd to keep the SweetPoll running
 -}
 type alias UpdateResult data =
     { sweetPollModel : Model data
-    , currentData : Maybe data
+    , newData : Maybe data
     , error : Maybe Http.Error
     , cmd : Cmd (Msg data)
     }
@@ -110,37 +110,44 @@ update action (Model model) =
                         else
                             -- Otherwise, leave everything the same.
                             ( model.delayMultiplier, model.sameCount + 1 )
+
+                    newModel =
+                        Model
+                            { model
+                                | lastData = Just newData
+                                , delayMultiplier = newDelayMultiplier
+                                , sameCount = newSameCount
+                            }
                 in
-                    Model
-                        { model
-                            | lastData = Just newData
-                            , delayMultiplier = newDelayMultiplier
-                            , sameCount = newSameCount
-                        }
-                        |> runPoll
+                    { sweetPollModel = newModel
+                    , newData = Just newData
+                    , error = Nothing
+                    , cmd = runPoll newModel
+                    }
 
             PollResult (Err error) ->
                 -- If there was an error, increase the delay and try again.
                 -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
                 if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
-                    Model { model | delayMultiplier = newDelayMultiplier }
-                        |> runPoll
-                        |> (\result -> { result | error = Just error })
+                    let
+                        newModel =
+                            Model { model | delayMultiplier = newDelayMultiplier }
+                    in
+                        { sweetPollModel = newModel
+                        , newData = Nothing
+                        , error = Just error
+                        , cmd = runPoll newModel
+                        }
                 else
                     { sweetPollModel = Model model
-                    , currentData = model.lastData
+                    , newData = Nothing
                     , error = Just error
                     , cmd = Cmd.none
                     }
 
 
-runPoll : Model data -> UpdateResult data
+runPoll : Model data -> Cmd (Msg data)
 runPoll (Model model) =
-    { sweetPollModel = Model model
-    , currentData = model.lastData
-    , error = Nothing
-    , cmd =
-        Process.sleep (model.config.delay * model.delayMultiplier)
-            |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
-            |> Task.attempt PollResult
-    }
+    Process.sleep (model.config.delay * model.delayMultiplier)
+        |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
+        |> Task.attempt PollResult
