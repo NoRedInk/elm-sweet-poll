@@ -1,4 +1,4 @@
-module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update)
+module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, UpdateResult, update)
 
 {-|
 
@@ -6,7 +6,7 @@ module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, update)
 @docs Config, defaultConfig
 
 # Elm Artchitecture
-@docs Model, Msg, init, update
+@docs Model, Msg, init, UpdateResult, update
 -}
 
 import Http
@@ -59,25 +59,36 @@ type Model data
 {-| -}
 init : Config data -> ( Model data, Cmd (Msg data) )
 init config =
-    Model
-        { delayMultiplier = 1.0
-        , sameCount = 1
-        , lastData = Nothing
-        , config = config
-        }
-        |> runPoll
-        |> -- lastData will always be Nothing here, so strip it out to keep init's type signature nicer
-           (\( model, _, cmd ) -> ( model, cmd ))
+    let
+        model =
+            Model
+                { delayMultiplier = 1.0
+                , sameCount = 1
+                , lastData = Nothing
+                , config = config
+                }
+    in
+        ( model, runPoll model )
+
+
+{-|
+
+ - sweetPollModel: the new state of the SweetPoll
+ - newData: any new data received by the SweetPoll
+ - error: any new error occurring in the current update cycle
+ - cmd: a Cmd to keep the SweetPoll running
+-}
+type alias UpdateResult data =
+    { sweetPollModel : Model data
+    , newData : Maybe data
+    , error : Maybe Http.Error
+    , cmd : Cmd (Msg data)
+    }
 
 
 {-| The SweetPoll StartApp-style update function
-
-Returns:
-  - The new SweetPoll model
-  - The current data, if there is any
-  - A command to keep SweetPoll running
 -}
-update : Msg data -> Model data -> ( Model data, Maybe data, Cmd (Msg data) )
+update : Msg data -> Model data -> UpdateResult data
 update action (Model model) =
     let
         newDelayMultiplier =
@@ -99,30 +110,44 @@ update action (Model model) =
                         else
                             -- Otherwise, leave everything the same.
                             ( model.delayMultiplier, model.sameCount + 1 )
-                in
-                    Model
-                        { model
-                            | lastData = Just newData
-                            , delayMultiplier = newDelayMultiplier
-                            , sameCount = newSameCount
-                        }
-                        |> runPoll
 
-            PollResult (Err _) ->
+                    newModel =
+                        Model
+                            { model
+                                | lastData = Just newData
+                                , delayMultiplier = newDelayMultiplier
+                                , sameCount = newSameCount
+                            }
+                in
+                    { sweetPollModel = newModel
+                    , newData = Just newData
+                    , error = Nothing
+                    , cmd = runPoll newModel
+                    }
+
+            PollResult (Err error) ->
                 -- If there was an error, increase the delay and try again.
                 -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
                 if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
-                    Model { model | delayMultiplier = newDelayMultiplier }
-                        |> runPoll
+                    let
+                        newModel =
+                            Model { model | delayMultiplier = newDelayMultiplier }
+                    in
+                        { sweetPollModel = newModel
+                        , newData = Nothing
+                        , error = Just error
+                        , cmd = runPoll newModel
+                        }
                 else
-                    ( Model model, model.lastData, Cmd.none )
+                    { sweetPollModel = Model model
+                    , newData = Nothing
+                    , error = Just error
+                    , cmd = Cmd.none
+                    }
 
 
-runPoll : Model data -> ( Model data, Maybe data, Cmd (Msg data) )
+runPoll : Model data -> Cmd (Msg data)
 runPoll (Model model) =
-    ( Model model
-    , model.lastData
-    , Process.sleep (model.config.delay * model.delayMultiplier)
+    Process.sleep (model.config.delay * model.delayMultiplier)
         |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
         |> Task.attempt PollResult
-    )

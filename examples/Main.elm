@@ -9,6 +9,7 @@ import SweetPoll
 
 type alias Model =
     { data : Maybe String
+    , error : Maybe String
     , sweetPoll : SweetPoll.Model String
     }
 
@@ -28,6 +29,7 @@ main =
         Html.program
             { init =
                 ( { data = Nothing
+                  , error = Nothing
                   , sweetPoll = sweetPollInit |> Tuple.first
                   }
                 , sweetPollInit |> Tuple.second
@@ -35,15 +37,20 @@ main =
             , update =
                 \action model ->
                     case Debug.log "update" <| SweetPoll.update action model.sweetPoll of
-                        ( newModel, newData, effects ) ->
-                            ( { sweetPoll = newModel
+                        { sweetPollModel, newData, error, cmd } ->
+                            ( { sweetPoll = sweetPollModel
                               , data = newData
+                              , error = error |> Maybe.map toString
                               }
-                            , effects
+                            , cmd
                             )
             , view =
                 \model ->
-                    Html.text (toString model.data)
+                    Html.div []
+                        [ Html.text ("new data: " ++ toString model.data)
+                        , Html.hr [] []
+                        , Html.text ("error: " ++ toString model.error)
+                        ]
                         |> BeautifulExample.view
                             { title = "elm-sweet-poll"
                             , details = Just """HTTP polling with smart retry backoff."""
