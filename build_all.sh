@@ -9,7 +9,7 @@ rm -Rf examples/elm-stuff/build-artifacts
 elm-make --yes
 
 pushd examples
-elm-make --yes
+elm-make --yes Main.elm
 popd
 
 # Tests are currently disabled until elm-testable is upgraded for Elm 0.18
