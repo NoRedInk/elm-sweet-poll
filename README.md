@@ -61,4 +61,11 @@ main =
             }
 ```
 
-This example is also included in the examples folder in the source code.
+This example is also included in the examples folder in the source code. Build with:
+
+```
+> cd elm-sweet-poll
+> ./build_all.sh
+> open examples/index.html
+
+```
