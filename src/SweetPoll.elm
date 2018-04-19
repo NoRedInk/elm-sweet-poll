@@ -1,12 +1,17 @@
-module SweetPoll exposing (Config, defaultConfig, Model, Msg, init, UpdateResult, update)
+module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init, update)
 
 {-|
 
+
 # Configuration
+
 @docs Config, defaultConfig
 
+
 # Elm Artchitecture
+
 @docs Model, Msg, init, UpdateResult, update
+
 -}
 
 import Http
@@ -68,15 +73,16 @@ init config =
                 , config = config
                 }
     in
-        ( model, runPoll model )
+    ( model, runPoll model )
 
 
 {-|
 
- - sweetPollModel: the new state of the SweetPoll
- - newData: any new data received by the SweetPoll
- - error: any new error occurring in the current update cycle
- - cmd: a Cmd to keep the SweetPoll running
+  - sweetPollModel: the new state of the SweetPoll
+  - newData: any new data received by the SweetPoll
+  - error: any new error occurring in the current update cycle
+  - cmd: a Cmd to keep the SweetPoll running
+
 -}
 type alias UpdateResult data =
     { sweetPollModel : Model data
@@ -94,56 +100,56 @@ update action (Model model) =
         newDelayMultiplier =
             model.delayMultiplier * model.config.delayMultiplier
     in
-        case action of
-            PollResult (Ok newData) ->
-                let
-                    dataChanged =
-                        Just newData /= model.lastData
+    case action of
+        PollResult (Ok newData) ->
+            let
+                dataChanged =
+                    Just newData /= model.lastData
 
-                    ( newDelayMultiplier, newSameCount ) =
-                        if dataChanged then
-                            -- If we got a different response, reset everything.
-                            ( 1.0, 1 )
-                        else if model.sameCount + 1 >= model.config.samesBeforeDelay then
-                            -- If we got the same response too many times in a row, up the delay.
-                            ( model.delayMultiplier * 1.2, model.sameCount + 1 )
-                        else
-                            -- Otherwise, leave everything the same.
-                            ( model.delayMultiplier, model.sameCount + 1 )
+                ( newDelayMultiplier, newSameCount ) =
+                    if dataChanged then
+                        -- If we got a different response, reset everything.
+                        ( 1.0, 1 )
+                    else if model.sameCount + 1 >= model.config.samesBeforeDelay then
+                        -- If we got the same response too many times in a row, up the delay.
+                        ( model.delayMultiplier * 1.2, model.sameCount + 1 )
+                    else
+                        -- Otherwise, leave everything the same.
+                        ( model.delayMultiplier, model.sameCount + 1 )
 
-                    newModel =
-                        Model
-                            { model
-                                | lastData = Just newData
-                                , delayMultiplier = newDelayMultiplier
-                                , sameCount = newSameCount
-                            }
-                in
-                    { sweetPollModel = newModel
-                    , newData = Just newData
-                    , error = Nothing
-                    , cmd = runPoll newModel
-                    }
-
-            PollResult (Err error) ->
-                -- If there was an error, increase the delay and try again.
-                -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
-                if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
-                    let
-                        newModel =
-                            Model { model | delayMultiplier = newDelayMultiplier }
-                    in
-                        { sweetPollModel = newModel
-                        , newData = Nothing
-                        , error = Just error
-                        , cmd = runPoll newModel
+                newModel =
+                    Model
+                        { model
+                            | lastData = Just newData
+                            , delayMultiplier = newDelayMultiplier
+                            , sameCount = newSameCount
                         }
-                else
-                    { sweetPollModel = Model model
-                    , newData = Nothing
-                    , error = Just error
-                    , cmd = Cmd.none
-                    }
+            in
+            { sweetPollModel = newModel
+            , newData = Just newData
+            , error = Nothing
+            , cmd = runPoll newModel
+            }
+
+        PollResult (Err error) ->
+            -- If there was an error, increase the delay and try again.
+            -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
+            if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
+                let
+                    newModel =
+                        Model { model | delayMultiplier = newDelayMultiplier }
+                in
+                { sweetPollModel = newModel
+                , newData = Nothing
+                , error = Just error
+                , cmd = runPoll newModel
+                }
+            else
+                { sweetPollModel = Model model
+                , newData = Nothing
+                , error = Just error
+                , cmd = Cmd.none
+                }
 
 
 runPoll : Model data -> Cmd (Msg data)
