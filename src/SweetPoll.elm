@@ -3,14 +3,14 @@ module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init
 {-|
 
 
-# Configuration
+# Configuration & Set up
 
-@docs Config, defaultConfig
+@docs init, defaultConfig, Config, Model
 
 
-# Elm Artchitecture
+# Working with responses
 
-@docs Model, Msg, init, UpdateResult, update
+@docs Msg, update, UpdateResult
 
 -}
 
@@ -21,7 +21,16 @@ import Task
 import Time exposing (Time)
 
 
-{-| -}
+{-|
+
+    - url: Route to poll against
+    - decoder: How to handle the data you expect back
+    - delay: How long to wait between poll attempts
+    - samesBeforeDelay: How many identical responses before increasing the delay
+    - delayMultiplier: How much to multiply the delay by when getting identical responses
+    - maxDelay: How long the delay should be before we give up on polling
+
+-}
 type alias Config data =
     { url : String
     , decoder : Json.Decoder data
@@ -32,7 +41,7 @@ type alias Config data =
     }
 
 
-{-| Default configuration for SweetPoll
+{-| Default configuration for SweetPoll.
 -}
 defaultConfig : Json.Decoder data -> String -> Config data
 defaultConfig decoder url =
@@ -50,7 +59,19 @@ type Msg data
     = PollResult (Result Http.Error data)
 
 
-{-| Private state of the SweetPoll component
+{-| Private state of the SweetPoll component.
+
+    import SweetPoll
+
+    type alias Model =
+        { sweetPollModel : SweetPoll.Model ServerData
+        , data : ServerData
+        , error : Maybe Http.Error
+        }
+
+    type alias ServerData =
+        {}
+
 -}
 type Model data
     = Model
@@ -61,7 +82,23 @@ type Model data
         }
 
 
-{-| -}
+{-| Initialize the SweetPoll behavior.
+
+    import SweetPoll
+    import Json.Decode as Decode
+
+    init : (Model, Cmd Msg)
+    init =
+        let
+            (sweetPollModel, sweetPollCommands) =
+                "www.example-url.com/get-some-data"
+                    |> SweetPoll.defaultConfig (Decode.succeed {})
+                    |> SweetPoll.init
+                    |> Tuple.mapSecond SweetPollMsg
+        in
+            ...
+
+-}
 init : Config data -> ( Model data, Cmd (Msg data) )
 init config =
     let
@@ -80,7 +117,7 @@ init config =
 
   - sweetPollModel: the new state of the SweetPoll
   - newData: any new data received by the SweetPoll
-  - error: any new error occurring in the current update cycle
+  - error: any new Http error occurring in the current update cycle
   - cmd: a Cmd to keep the SweetPoll running
 
 -}
@@ -92,7 +129,27 @@ type alias UpdateResult data =
     }
 
 
-{-| The SweetPoll StartApp-style update function
+{-| Takes the SweetPoll Msg and Model and produces a non-opaque result that you
+can work with.
+
+    import SweetPoll
+
+    type Msg
+        = SweetPollMsg (SweetPoll.Msg ServerData)
+
+    update : Msg -> Model -> ( Model, Cmd Msg )
+    update msg model =
+        case msg of
+            SweetPollMsg sweetPollMsg ->
+                case SweetPoll.update action model.sweetPollModel of
+                    { sweetPollModel, newData, error, cmd } ->
+                        ( { sweetPollModel = sweetPollModel
+                          , data = newData
+                          , error = error
+                          }
+                        , cmd
+                        )
+
 -}
 update : Msg data -> Model data -> UpdateResult data
 update action (Model model) =
