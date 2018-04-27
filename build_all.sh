@@ -11,9 +11,3 @@ elm-make --yes
 pushd examples
 elm-make --yes Main.elm
 popd
-
-# Tests are currently disabled until elm-testable is upgraded for Elm 0.18
-#
-# pushd tests
-# elm-make --yes --output tests.js TestRunner.elm
-# node tests.js
