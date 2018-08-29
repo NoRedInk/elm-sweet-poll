@@ -18,7 +18,6 @@ import Http
 import Json.Decode as Json
 import Process
 import Task
-import Time exposing (Time)
 
 
 {-|
@@ -34,10 +33,10 @@ import Time exposing (Time)
 type alias Config data =
     { url : String
     , decoder : Json.Decoder data
-    , delay : Time
+    , delay : Float
     , samesBeforeDelay : Int
     , delayMultiplier : Float
-    , maxDelay : Time
+    , maxDelay : Float
     }
 
 
@@ -47,10 +46,10 @@ defaultConfig : Json.Decoder data -> String -> Config data
 defaultConfig decoder url =
     { decoder = decoder
     , url = url
-    , delay = 7 * Time.second
+    , delay = 1000 * 7
     , samesBeforeDelay = 3
     , delayMultiplier = 1.2
-    , maxDelay = 3 * Time.minute
+    , maxDelay = 1000 * 60 * 3
     }
 
 
@@ -153,10 +152,6 @@ can work with.
 -}
 update : Msg data -> Model data -> UpdateResult data
 update action (Model model) =
-    let
-        newDelayMultiplier =
-            model.delayMultiplier * model.config.delayMultiplier
-    in
     case action of
         PollResult (Ok newData) ->
             let
@@ -189,6 +184,10 @@ update action (Model model) =
             }
 
         PollResult (Err error) ->
+            let
+                newDelayMultiplier =
+                    model.delayMultiplier * model.config.delayMultiplier
+            in
             -- If there was an error, increase the delay and try again.
             -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
             if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
