@@ -15,9 +15,9 @@ module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init
 -}
 
 import Http
-import Json.Decode as Json
+import Json.Decode as Json exposing (Decoder)
 import Process
-import Task
+import Task exposing (Task)
 
 
 {-|
@@ -211,5 +211,19 @@ update action (Model model) =
 runPoll : Model data -> Cmd (Msg data)
 runPoll (Model model) =
     Process.sleep (model.config.delay * model.delayMultiplier)
-        |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
+        |> Task.andThen (\_ -> toTask model.config.url model.config.decoder)
         |> Task.attempt PollResult
+
+
+toTask : String -> Decoder a -> Task Http.Error a
+toTask url decoder =
+    { method = "GET"
+    , headers = [ Http.header "Accept" "application/json" ]
+    , url = url
+    , body = Http.emptyBody
+    , expect = Http.expectJson decoder
+    , timeout = Nothing
+    , withCredentials = False
+    }
+        |> Http.request
+        |> Http.toTask
