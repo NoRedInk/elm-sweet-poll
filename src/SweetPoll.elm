@@ -1,4 +1,7 @@
-module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init, update)
+module SweetPoll exposing
+    ( init, defaultConfig, Config, Model
+    , Msg, update, UpdateResult
+    )
 
 {-|
 
@@ -162,9 +165,11 @@ update action (Model model) =
                     if dataChanged then
                         -- If we got a different response, reset everything.
                         ( 1.0, 1 )
+
                     else if model.sameCount + 1 >= model.config.samesBeforeDelay then
                         -- If we got the same response too many times in a row, up the delay.
                         ( model.delayMultiplier * 1.2, model.sameCount + 1 )
+
                     else
                         -- Otherwise, leave everything the same.
                         ( model.delayMultiplier, model.sameCount + 1 )
@@ -200,6 +205,7 @@ update action (Model model) =
                 , error = Just error
                 , cmd = runPoll newModel
                 }
+
             else
                 { sweetPollModel = Model model
                 , newData = Nothing
