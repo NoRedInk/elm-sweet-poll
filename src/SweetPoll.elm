@@ -223,13 +223,41 @@ runPoll (Model model) =
 
 toTask : String -> Decoder a -> Task Http.Error a
 toTask url decoder =
-    { method = "GET"
-    , headers = [ Http.header "Accept" "application/json" ]
-    , url = url
-    , body = Http.emptyBody
-    , expect = Http.expectJson decoder
-    , timeout = Nothing
-    , withCredentials = False
-    }
-        |> Http.request
-        |> Http.toTask
+    Http.task
+        { method = "GET"
+        , headers = [ Http.header "Accept" "application/json" ]
+        , url = url
+        , body = Http.emptyBody
+        , resolver = resolveJsonResponse decoder
+        , timeout = Nothing
+        }
+
+
+{-| `Http.task` requires you to specify your own "resolver". We don't
+actually want to do anything special here, so this just attempts to
+re-implement the expected behavior from a normal request.
+
+See `elm/http` docs [here.](https://package.elm-lang.org/packages/elm/http/latest/Http#expectStringResponse)
+
+-}
+resolveJsonResponse : Decoder a -> Http.Resolver Http.Error a
+resolveJsonResponse decoder =
+    Http.stringResolver <|
+        \response ->
+            case response of
+                Http.BadUrl_ badUrl ->
+                    Err (Http.BadUrl badUrl)
+
+                Http.Timeout_ ->
+                    Err Http.Timeout
+
+                Http.NetworkError_ ->
+                    Err Http.NetworkError
+
+                Http.BadStatus_ metadata _ ->
+                    Err (Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ _ body ->
+                    body
+                        |> Json.decodeString decoder
+                        |> Result.mapError (Json.errorToString >> Http.BadBody)
