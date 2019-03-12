@@ -3,7 +3,7 @@
     "name": "NoRedInk/elm-sweet-poll",
     "summary": "HTTP polling with backoff when the server response doesn't change",
     "license": "BSD-3-Clause",
-    "version": "5.0.1",
+    "version": "5.0.2",
     "exposed-modules": [
         "SweetPoll"
     ],
