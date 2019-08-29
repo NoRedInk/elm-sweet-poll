@@ -1,5 +1,5 @@
 module SweetPoll exposing
-    ( init, defaultConfig, Config, Model
+    ( init, defaultConfig, Config, PollingState
     , Msg, update, UpdateResult
     )
 
@@ -8,7 +8,7 @@ module SweetPoll exposing
 
 # Configuration & Set up
 
-@docs init, defaultConfig, Config, Model
+@docs init, defaultConfig, Config, PollingState
 
 
 # Working with responses
@@ -65,8 +65,8 @@ type Msg data
 
     import SweetPoll
 
-    type alias Model =
-        { sweetPollModel : SweetPoll.Model ServerData
+    type alias PollingState =
+        { sweetPoll : SweetPoll.PollingState ServerData
         , data : ServerData
         , error : Maybe Http.Error
         }
@@ -75,12 +75,11 @@ type Msg data
         {}
 
 -}
-type Model data
-    = Model
+type PollingState data
+    = PollingState
         { delayMultiplier : Float
         , sameCount : Int
         , lastData : Maybe data
-        , config : Config data
         }
 
 
@@ -101,30 +100,29 @@ type Model data
             ...
 
 -}
-init : Config data -> ( Model data, Cmd (Msg data) )
+init : Config data -> ( PollingState data, Cmd (Msg data) )
 init config =
     let
         model =
-            Model
+            PollingState
                 { delayMultiplier = 1.0
                 , sameCount = 1
                 , lastData = Nothing
-                , config = config
                 }
     in
-    ( model, runPoll model )
+    ( model, runPoll config model )
 
 
 {-|
 
-  - sweetPollModel: the new state of the SweetPoll
+  - newState: the new state of the SweetPoll
   - newData: any new data received by the SweetPoll
   - error: any new Http error occurring in the current update cycle
   - cmd: a Cmd to keep the SweetPoll running
 
 -}
 type alias UpdateResult data =
-    { sweetPollModel : Model data
+    { newState : PollingState data
     , newData : Maybe data
     , error : Maybe Http.Error
     , cmd : Cmd (Msg data)
@@ -153,8 +151,8 @@ can work with.
                         )
 
 -}
-update : Msg data -> Model data -> UpdateResult data
-update action (Model model) =
+update : Config data -> Msg data -> PollingState data -> UpdateResult data
+update config action (PollingState model) =
     case action of
         PollResult (Ok newData) ->
             let
@@ -166,7 +164,7 @@ update action (Model model) =
                         -- If we got a different response, reset everything.
                         ( 1.0, 1 )
 
-                    else if model.sameCount + 1 >= model.config.samesBeforeDelay then
+                    else if model.sameCount + 1 >= config.samesBeforeDelay then
                         -- If we got the same response too many times in a row, up the delay.
                         ( model.delayMultiplier * 1.2, model.sameCount + 1 )
 
@@ -174,50 +172,50 @@ update action (Model model) =
                         -- Otherwise, leave everything the same.
                         ( model.delayMultiplier, model.sameCount + 1 )
 
-                newModel =
-                    Model
+                newState =
+                    PollingState
                         { model
                             | lastData = Just newData
                             , delayMultiplier = newDelayMultiplier
                             , sameCount = newSameCount
                         }
             in
-            { sweetPollModel = newModel
+            { newState = newState
             , newData = Just newData
             , error = Nothing
-            , cmd = runPoll newModel
+            , cmd = runPoll config newState
             }
 
         PollResult (Err error) ->
             let
                 newDelayMultiplier =
-                    model.delayMultiplier * model.config.delayMultiplier
+                    model.delayMultiplier * config.delayMultiplier
             in
             -- If there was an error, increase the delay and try again.
             -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
-            if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
+            if config.delay * newDelayMultiplier <= config.maxDelay then
                 let
-                    newModel =
-                        Model { model | delayMultiplier = newDelayMultiplier }
+                    newState =
+                        PollingState { model | delayMultiplier = newDelayMultiplier }
                 in
-                { sweetPollModel = newModel
+                { newState = newState
                 , newData = Nothing
                 , error = Just error
-                , cmd = runPoll newModel
+                , cmd = runPoll config newState
                 }
 
             else
-                { sweetPollModel = Model model
+                { newState = PollingState model
                 , newData = Nothing
                 , error = Just error
                 , cmd = Cmd.none
                 }
 
 
-runPoll : Model data -> Cmd (Msg data)
-runPoll (Model model) =
-    Process.sleep (model.config.delay * model.delayMultiplier)
-        |> Task.andThen (\_ -> toTask model.config.url model.config.decoder)
+runPoll : Config data -> PollingState data -> Cmd (Msg data)
+runPoll config (PollingState model) =
+    Process.sleep (config.delay * model.delayMultiplier)
+        |> Task.andThen (\_ -> toTask config.url config.decoder)
         |> Task.attempt PollResult
 
 

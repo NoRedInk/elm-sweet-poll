@@ -9,7 +9,7 @@ import SweetPoll
 type alias Model =
     { data : Maybe String
     , error : Maybe String
-    , sweetPoll : SweetPoll.Model String
+    , sweetPoll : SweetPoll.PollingState String
     }
 
 
@@ -22,7 +22,7 @@ main =
                 -- From http://tiny.cc/currenttime
                 "https://script.google.com/macros/s/AKfycbyd5AcbAnWi2Yn0xhFRbyzS4qMq1VucMVgVvhul5XqS9HkAyJY/exec"
 
-        sweetPollInit =
+        ( initialPollingState, initialCmd ) =
             SweetPoll.init config
     in
     Browser.element
@@ -30,15 +30,15 @@ main =
             \_ ->
                 ( { data = Nothing
                   , error = Nothing
-                  , sweetPoll = sweetPollInit |> Tuple.first
+                  , sweetPoll = initialPollingState
                   }
-                , sweetPollInit |> Tuple.second
+                , initialCmd
                 )
         , update =
             \action model ->
-                case SweetPoll.update action model.sweetPoll of
-                    { sweetPollModel, newData, error, cmd } ->
-                        ( { sweetPoll = sweetPollModel
+                case SweetPoll.update config action model.sweetPoll of
+                    { newState, newData, error, cmd } ->
+                        ( { sweetPoll = newState
                           , data = newData
                           , error = error |> Maybe.map Debug.toString
                           }
