@@ -1,4 +1,7 @@
-module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init, update)
+module SweetPoll exposing
+    ( init, defaultConfig, Config, Model
+    , Msg, update, UpdateResult
+    )
 
 {-|
 
@@ -15,10 +18,9 @@ module SweetPoll exposing (Config, Model, Msg, UpdateResult, defaultConfig, init
 -}
 
 import Http
-import Json.Decode as Json
+import Json.Decode as Json exposing (Decoder)
 import Process
-import Task
-import Time exposing (Time)
+import Task exposing (Task)
 
 
 {-|
@@ -34,10 +36,10 @@ import Time exposing (Time)
 type alias Config data =
     { url : String
     , decoder : Json.Decoder data
-    , delay : Time
+    , delay : Float
     , samesBeforeDelay : Int
     , delayMultiplier : Float
-    , maxDelay : Time
+    , maxDelay : Float
     }
 
 
@@ -47,10 +49,10 @@ defaultConfig : Json.Decoder data -> String -> Config data
 defaultConfig decoder url =
     { decoder = decoder
     , url = url
-    , delay = 7 * Time.second
+    , delay = 1000 * 7
     , samesBeforeDelay = 3
     , delayMultiplier = 1.2
-    , maxDelay = 3 * Time.minute
+    , maxDelay = 1000 * 60 * 3
     }
 
 
@@ -153,10 +155,6 @@ can work with.
 -}
 update : Msg data -> Model data -> UpdateResult data
 update action (Model model) =
-    let
-        newDelayMultiplier =
-            model.delayMultiplier * model.config.delayMultiplier
-    in
     case action of
         PollResult (Ok newData) ->
             let
@@ -167,9 +165,11 @@ update action (Model model) =
                     if dataChanged then
                         -- If we got a different response, reset everything.
                         ( 1.0, 1 )
+
                     else if model.sameCount + 1 >= model.config.samesBeforeDelay then
                         -- If we got the same response too many times in a row, up the delay.
                         ( model.delayMultiplier * 1.2, model.sameCount + 1 )
+
                     else
                         -- Otherwise, leave everything the same.
                         ( model.delayMultiplier, model.sameCount + 1 )
@@ -189,6 +189,10 @@ update action (Model model) =
             }
 
         PollResult (Err error) ->
+            let
+                newDelayMultiplier =
+                    model.delayMultiplier * model.config.delayMultiplier
+            in
             -- If there was an error, increase the delay and try again.
             -- Once we hit maxDelay, give up. (Something's probably irreparably broken.)
             if model.config.delay * newDelayMultiplier <= model.config.maxDelay then
@@ -201,6 +205,7 @@ update action (Model model) =
                 , error = Just error
                 , cmd = runPoll newModel
                 }
+
             else
                 { sweetPollModel = Model model
                 , newData = Nothing
@@ -212,5 +217,47 @@ update action (Model model) =
 runPoll : Model data -> Cmd (Msg data)
 runPoll (Model model) =
     Process.sleep (model.config.delay * model.delayMultiplier)
-        |> Task.andThen (\_ -> Http.toTask <| Http.get model.config.url model.config.decoder)
+        |> Task.andThen (\_ -> toTask model.config.url model.config.decoder)
         |> Task.attempt PollResult
+
+
+toTask : String -> Decoder a -> Task Http.Error a
+toTask url decoder =
+    Http.task
+        { method = "GET"
+        , headers = [ Http.header "Accept" "application/json" ]
+        , url = url
+        , body = Http.emptyBody
+        , resolver = resolveJsonResponse decoder
+        , timeout = Nothing
+        }
+
+
+{-| `Http.task` requires you to specify your own "resolver". We don't
+actually want to do anything special here, so this just attempts to
+re-implement the expected behavior from a normal request.
+
+See `elm/http` docs [here.](https://package.elm-lang.org/packages/elm/http/latest/Http#expectStringResponse)
+
+-}
+resolveJsonResponse : Decoder a -> Http.Resolver Http.Error a
+resolveJsonResponse decoder =
+    Http.stringResolver <|
+        \response ->
+            case response of
+                Http.BadUrl_ badUrl ->
+                    Err (Http.BadUrl badUrl)
+
+                Http.Timeout_ ->
+                    Err Http.Timeout
+
+                Http.NetworkError_ ->
+                    Err Http.NetworkError
+
+                Http.BadStatus_ metadata _ ->
+                    Err (Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ _ body ->
+                    body
+                        |> Json.decodeString decoder
+                        |> Result.mapError (Json.errorToString >> Http.BadBody)

@@ -2,14 +2,13 @@
 
 set -ex
 
-rm -Rf elm-stuff/build-artifacts
-rm -Rf tests/elm-stuff/build-artifacts
-rm -Rf examples/elm-stuff/build-artifacts
+rm -Rf elm-stuff
+rm -Rf examples/elm-stuff
 
-elm-make --yes
+elm make
 
 pushd examples
-elm-make --yes Main.elm
+elm make Main.elm
 popd
 
 # Tests are currently disabled until elm-testable is upgraded for Elm 0.18
