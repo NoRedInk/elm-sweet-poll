@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "test": "elm-test && elm-format --validate . && npm run-script check",
+    "check": "elm make --docs=docs.json"
+  },
+  "devDependencies": {
+    "elm": "^0.19.0-no-deps",
+    "elm-format": "^0.8.2",
+    "elm-test": "^0.19.0-rev6"
+  }
+}

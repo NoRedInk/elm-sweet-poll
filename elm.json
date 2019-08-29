@@ -13,5 +13,8 @@
         "elm/http": "2.0.0 <= v < 3.0.0",
         "elm/json": "1.1.0 <= v < 2.0.0"
     },
-    "test-dependencies": {}
+    "test-dependencies": {
+        "avh4/elm-program-test": "2.3.2 <= v < 3.0.0",
+        "elm/time": "1.0.0 <= v < 2.0.0"
+    }
 }

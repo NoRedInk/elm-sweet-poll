@@ -1,12 +1,9 @@
-module SweetPollTests exposing (..)
+module SweetPollTests exposing (all)
 
-import ElmTest exposing (..)
+import Http as RealHttp
 import Json.Decode as Json
 import SweetPoll
-import Time
-import Testable.Http as Http
-import Http as RealHttp
-import Testable.TestContext exposing (..)
+import TestContext exposing (TestContext)
 import Time
 
 
@@ -24,11 +21,13 @@ config =
     SweetPoll.defaultConfig myDataDecoder "https://example.com/"
 
 
-container :
-    Component (SweetPoll.Action MyData)
-        { sweetPoll : SweetPoll.Model MyData
-        , lastAction : Maybe (SweetPoll.Action MyData)
-        }
+type alias TestModel =
+    { sweetPoll : SweetPoll.Model MyData
+    , lastAction : Maybe (SweetPoll.Action MyData)
+    }
+
+
+container : TestContext TestModel (SweetPoll.Action MyData) Never
 container =
     { init =
         case SweetPoll.init config of
@@ -67,41 +66,41 @@ all =
                         (Http.getRequest "https://example.com/")
                         (Http.ok "\"data-1\"")
           in
-            suite
-                "when initial HTTP request succeeds"
-                [ successfulNetworkRequest
-                    |> currentModel
-                    |> Result.map .lastAction
-                    |> assertEqual (Ok <| Just <| SweetPoll.PollSuccess <| MyData "data-1")
-                    |> test "sends data to the parent"
-                , successfulNetworkRequest
-                    |> advanceTime (7 * Time.second)
-                    |> assertHttpRequest
-                        (Http.getRequest "https://example.com/")
-                    |> test "makes a new HTTP request after the delay"
-                , container
-                    |> startForTest
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
-                    |> advanceTime (7 * Time.second)
-                    |> assertNoPendingHttpRequests
-                    |> test "increases the delay when the same data is returned 3 times in a row"
-                , container
-                    |> startForTest
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
-                    |> advanceTime (7 * Time.second)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-2\"")
-                    |> advanceTime (7 * Time.second)
-                    |> assertHttpRequest (Http.getRequest "https://example.com/")
-                    |> test "don't increase the delay when the new data is returned"
-                ]
+          suite
+            "when initial HTTP request succeeds"
+            [ successfulNetworkRequest
+                |> currentModel
+                |> Result.map .lastAction
+                |> assertEqual (Ok <| Just <| SweetPoll.PollSuccess <| MyData "data-1")
+                |> test "sends data to the parent"
+            , successfulNetworkRequest
+                |> advanceTime (7 * Time.second)
+                |> assertHttpRequest
+                    (Http.getRequest "https://example.com/")
+                |> test "makes a new HTTP request after the delay"
+            , container
+                |> startForTest
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+                |> advanceTime (7 * Time.second)
+                |> assertNoPendingHttpRequests
+                |> test "increases the delay when the same data is returned 3 times in a row"
+            , container
+                |> startForTest
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-1\"")
+                |> advanceTime (7 * Time.second)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Http.ok "\"data-2\"")
+                |> advanceTime (7 * Time.second)
+                |> assertHttpRequest (Http.getRequest "https://example.com/")
+                |> test "don't increase the delay when the new data is returned"
+            ]
         , let
             failedNetworkRequest =
                 container
@@ -111,82 +110,82 @@ all =
                         (Http.getRequest "https://example.com/")
                         (Err RealHttp.RawTimeout)
           in
-            suite
-                "when initial HTTP request fails"
+          suite
+            "when initial HTTP request fails"
+            [ failedNetworkRequest
+                |> currentModel
+                |> Result.map .lastAction
+                |> assertEqual (Ok <| Just <| SweetPoll.PollFailure <| RealHttp.Timeout)
+                |> test "sends data to the parent"
+            , suite
+                "makes a new HTTP request after an increased delay"
                 [ failedNetworkRequest
-                    |> currentModel
-                    |> Result.map .lastAction
-                    |> assertEqual (Ok <| Just <| SweetPoll.PollFailure <| RealHttp.Timeout)
-                    |> test "sends data to the parent"
-                , suite
-                    "makes a new HTTP request after an increased delay"
-                    [ failedNetworkRequest
-                        |> advanceTime (7 * Time.second * 1.2)
-                        |> assertHttpRequest
-                            (Http.getRequest "https://example.com/")
-                        |> test "(1)"
-                    , failedNetworkRequest
-                        |> advanceTime (7 * Time.second * 1.2 - 1)
-                        |> assertNoPendingHttpRequests
-                        |> test "(2)"
-                    ]
-                , suite
-                    "delay increases after each error"
-                    [ failedNetworkRequest
-                        |> advanceTime (7 * Time.second * 1.2)
-                        |> resolveHttpRequest
-                            (Http.getRequest "https://example.com/")
-                            (Err RealHttp.RawTimeout)
-                        |> advanceTime (7 * Time.second * 1.2 * 1.2)
-                        |> assertHttpRequest
-                            (Http.getRequest "https://example.com/")
-                        |> test "(1)"
-                    , failedNetworkRequest
-                        |> advanceTime (7 * Time.second * 1.2)
-                        |> resolveHttpRequest
-                            (Http.getRequest "https://example.com/")
-                            (Err RealHttp.RawTimeout)
-                        |> advanceTime (7 * Time.second * 1.2 * 1.2 - 1)
-                        |> assertNoPendingHttpRequests
-                        |> test "(1)"
-                    ]
+                    |> advanceTime (7 * Time.second * 1.2)
+                    |> assertHttpRequest
+                        (Http.getRequest "https://example.com/")
+                    |> test "(1)"
                 , failedNetworkRequest
-                    |> advanceTime (7 * Time.second * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
-                    |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
-                    |> advanceTime 10000000
+                    |> advanceTime (7 * Time.second * 1.2 - 1)
                     |> assertNoPendingHttpRequests
-                    |> test "if the max delay is reached with no successful polls, then stop polling"
+                    |> test "(2)"
                 ]
+            , suite
+                "delay increases after each error"
+                [ failedNetworkRequest
+                    |> advanceTime (7 * Time.second * 1.2)
+                    |> resolveHttpRequest
+                        (Http.getRequest "https://example.com/")
+                        (Err RealHttp.RawTimeout)
+                    |> advanceTime (7 * Time.second * 1.2 * 1.2)
+                    |> assertHttpRequest
+                        (Http.getRequest "https://example.com/")
+                    |> test "(1)"
+                , failedNetworkRequest
+                    |> advanceTime (7 * Time.second * 1.2)
+                    |> resolveHttpRequest
+                        (Http.getRequest "https://example.com/")
+                        (Err RealHttp.RawTimeout)
+                    |> advanceTime (7 * Time.second * 1.2 * 1.2 - 1)
+                    |> assertNoPendingHttpRequests
+                    |> test "(1)"
+                ]
+            , failedNetworkRequest
+                |> advanceTime (7 * Time.second * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime (7 * Time.second * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 * 1.2 + 1)
+                |> resolveHttpRequest (Http.getRequest "https://example.com/") (Err RealHttp.RawTimeout)
+                |> advanceTime 10000000
+                |> assertNoPendingHttpRequests
+                |> test "if the max delay is reached with no successful polls, then stop polling"
+            ]
         ]
