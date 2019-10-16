@@ -141,7 +141,7 @@ can work with.
     update msg model =
         case msg of
             SweetPollMsg sweetPollMsg ->
-                case SweetPoll.update action model.sweetPollModel of
+                case SweetPoll.update SweetPoll.defaultConfig sweetPollMsg model.sweetPollModel of
                     { sweetPollModel, newData, error, cmd } ->
                         ( { sweetPollModel = sweetPollModel
                           , data = newData
